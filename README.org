@@ -10,3 +10,122 @@ docker compose up -d
 Then open http://traffic-dataviz.127.0.0.1.nip.io:5601
 
 
+* Static data import
+
+Upload file:
+- choose _mdate_ as date field
+- set mapping to
+
+  #+begin_src json
+  {
+  "properties": {
+    "@timestamp": {
+      "type": "date"
+    },
+    "Geo Point": {
+      "type": "geo_point"
+    },
+    "Geo Shape": {
+      "type": "geo_shape"
+    },
+    "arret": {
+      "type": "boolean"
+    },
+    "bloque": {
+      "type": "long"
+    },
+    "cdate": {
+      "type": "date",
+      "format": "yyyy-MM-dd HH:mm:ss"
+    },
+    "etat": {
+      "type": "keyword"
+    },
+    "geom_err": {
+      "type": "long"
+    },
+    "geom_o": {
+      "type": "long"
+    },
+    "gid": {
+      "type": "long"
+    },
+    "localise": {
+      "type": "long"
+    },
+    "mdate": {
+      "type": "date",
+      "format": "yyyy-MM-dd HH:mm:ss"
+    },
+    "neutralise": {
+      "type": "long"
+    },
+    "pmr": {
+      "type": "long"
+    },
+    "retard": {
+      "type": "long"
+    },
+    "rs_sv_arret_p_actu": {
+      "type": "long"
+    },
+    "rs_sv_arret_p_suiv": {
+      "type": "long"
+    },
+    "rs_sv_chem_l": {
+      "type": "long"
+    },
+    "rs_sv_cours_a": {
+      "type": "long"
+    },
+    "rs_sv_ligne_a": {
+      "type": "long"
+    },
+    "sae": {
+      "type": "long"
+    },
+    "sens": {
+      "type": "keyword"
+    },
+    "statut": {
+      "type": "keyword"
+    },
+    "terminus": {
+      "type": "keyword"
+    },
+    "vehicule": {
+      "type": "keyword"
+    },
+    "vitesse": {
+      "type": "long"
+    }
+  }
+}
+  #+end_src
+- set ingest pipeline to
+  #+begin_src json
+  {
+  "description": "Ingest pipeline created by text structure finder",
+  "processors": [
+    {
+      "date": {
+        "field": "mdate",
+        "timezone": "{{ event.timezone }}",
+        "formats": [
+          "yyyy-MM-dd HH:mm:ss"
+        ]
+      }
+    },
+
+
+{
+  "json" : {
+    "field" : "Geo Shape",
+    "target_field" : "Geo Shape"
+  }
+}
+
+
+  ]
+}
+  #+end_src
