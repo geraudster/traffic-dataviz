@@ -1,0 +1,12 @@
+* Demo traffic dataviz
+
+#+begin_src bash
+git clone this project
+
+cd traffic-dataviz/docker
+docker compose up -d
+#+end_src
+
+Then open http://traffic-dataviz.127.0.0.1.nip.io:5601
+
+
