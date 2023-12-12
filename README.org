@@ -1,13 +1,3 @@
-* Demo traffic dataviz
-
-#+begin_src bash
-git clone this project
-
-cd traffic-dataviz/docker
-docker compose up -d
-#+end_src
-
-Then open http://traffic-dataviz.127.0.0.1.nip.io:5601
 
 
 * Static data import
@@ -129,3 +119,60 @@ Upload file:
   ]
 }
   #+end_src
+
+* With kube
+
+#+begin_src
+minikube start -p es-traffic --cpus=6 --memory=12g --vm
+minikube profile es-traffic
+minikube kubectl -- get pods -A
+#+end_src
+
+Install operator:
+#+begin_src
+helm repo add elastic https://helm.elastic.co
+
+
+helm install elastic-operator elastic/eck-operator -n elastic-system --create-namespace
+
+
+
+cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: Secret
+metadata:
+  name: eck-trial-license
+  namespace: elastic-system
+  labels:
+    license.k8s.elastic.co/type: enterprise_trial
+  annotations:
+    elastic.co/eula: accepted 
+EOF
+
+
+
+#+end_src
+
+Check with:
+
+#+begin_src 
+$ watch kubectl get elastic -n elastic-stack -l "app.kubernetes.io/instance"=eck-stack-with-fleet
+#+end_src
+
+Install stack:
+#+begin_src
+helm install eck-stack-with-fleet elastic/eck-stack \
+    --values demo-stack.yaml -n elastic-stack
+#+end_src
+
+Retrieve elastic password:
+#+begin_src
+kubectl get secret elasticsearch-es-elastic-user -o=jsonpath='{.data.elastic}' -n elastic-stack | base64 --decode; echo
+#+end_src
+
+Port forward:
+#+begin_src
+kubectl port-forward service/kibana-kb-http 5601 -n elastic-stack
+#+end_src
+
+Open https://traffic-dataviz.127.0.0.1.nip.io:5601/

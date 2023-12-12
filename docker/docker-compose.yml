@@ -57,6 +57,8 @@ services:
       interval: 10s
       timeout: 10s
       retries: 120
+    networks:
+      - demonet
 
   kibana:
     depends_on:
@@ -87,6 +89,8 @@ services:
       interval: 10s
       timeout: 10s
       retries: 120
+    networks:
+      - demonet
 
 volumes:
   certs:
@@ -95,3 +99,6 @@ volumes:
     driver: local
   kibanadata:
     driver: local
+
+networks:
+  demonet:
