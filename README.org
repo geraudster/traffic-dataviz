@@ -153,16 +153,15 @@ EOF
 
 #+end_src
 
-Check with:
-
-#+begin_src 
-$ watch kubectl get elastic -n elastic-stack -l "app.kubernetes.io/instance"=eck-stack-with-fleet
-#+end_src
-
 Install stack:
 #+begin_src
 helm install eck-stack-with-fleet elastic/eck-stack \
-    --values demo-stack.yaml -n elastic-stack
+    --values demo-stack.yaml -n elastic-stack --create-namespace
+#+end_src
+
+Check with:
+#+begin_src 
+$ watch kubectl get elastic -n elastic-stack -l "app.kubernetes.io/instance"=eck-stack-with-fleet
 #+end_src
 
 Retrieve elastic password:
@@ -176,3 +175,4 @@ kubectl port-forward service/kibana-kb-http 5601 -n elastic-stack
 #+end_src
 
 Open https://traffic-dataviz.127.0.0.1.nip.io:5601/
+
