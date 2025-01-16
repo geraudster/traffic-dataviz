@@ -176,3 +176,313 @@ kubectl port-forward service/kibana-kb-http 5601 -n elastic-stack
 
 Open https://traffic-dataviz.127.0.0.1.nip.io:5601/
 
+* Configure templates
+
+#+begin_src json
+PUT _ilm/policy/sv_vehic_p
+{
+ "policy": {
+   "phases": {
+     "hot": {
+       "min_age": "0ms",
+       "actions": {
+         "rollover": {
+           "max_primary_shard_size": "50gb",
+           "max_age": "7d"
+         },
+         "set_priority": {
+           "priority": 100
+         }
+       }
+     },
+     "delete": {
+       "min_age": "365d",
+       "actions": {
+         "delete": {
+           "delete_searchable_snapshot": true
+         }
+       }
+     }
+   }
+ }
+}
+#+end_src
+
+#+begin_src
+PUT _ingest/pipeline/sv_vehic_p_for_elastic_agent
+{
+  "description": "Ingest pipeline for httpjson agent",
+  "processors": [
+    {
+      "json": {
+        "field": "message",
+        "add_to_root": true,
+        "ignore_failure": true
+      }
+    },
+    {
+      "date": {
+        "field": "properties.mdate",
+        "formats": [
+          "ISO8601"
+        ],
+        "ignore_failure": true
+      }
+    },
+    {
+      "rename": {
+        "field": "properties",
+        "target_field": "vehicule",
+        "ignore_failure": true,
+        "ignore_missing": true
+      }
+    },
+    {
+      "rename": {
+        "field": "geometry",
+        "target_field": "Geo Shape",
+        "ignore_failure": true,
+        "ignore_missing": true
+      }
+    }
+  ]
+}
+#+end_src
+
+#+begin_src json
+PUT _component_template/logs-httpjson.sv_vehic_p@package
+{
+  "template": {
+    "settings": {
+      "index": {
+        "lifecycle": {
+          "name": "sv_vehic_p"
+        },
+        "codec": "best_compression",
+        "default_pipeline": "sv_vehic_p_for_elastic_agent"
+      }
+    },
+    "mappings": {
+      "properties": {
+        "@timestamp": {
+          "type": "date"
+        },
+        "event": {
+          "properties": {
+            "created": {
+              "type": "date"
+            },
+            "module": {
+              "type": "constant_keyword",
+              "value": "httpjson"
+            },
+            "dataset": {
+              "type": "constant_keyword",
+              "value": "httpjson.sv_vehic_p"
+            }
+          }
+        },
+        "Geo Point": {
+          "type": "geo_point"
+        },
+        "Geo Shape": {
+          "type": "geo_shape"
+        },
+        "vehicule": {
+          "type": "object",
+          "properties": {
+            "arret": {
+              "type": "boolean"
+            },
+            "bloque": {
+              "type": "boolean"
+            },
+            "cdate": {
+              "type": "date"
+            },
+            "etat": {
+              "type": "keyword"
+            },
+            "geom_err": {
+              "type": "long"
+            },
+            "geom_o": {
+              "type": "long"
+            },
+            "gid": {
+              "type": "long"
+            },
+            "localise": {
+              "type": "boolean"
+            },
+            "mdate": {
+              "type": "date"
+            },
+            "neutralise": {
+              "type": "boolean"
+            },
+            "pmr": {
+              "type": "boolean"
+            },
+            "retard": {
+              "type": "long"
+            },
+            "rs_sv_arret_p_actu": {
+              "type": "long"
+            },
+            "rs_sv_arret_p_suiv": {
+              "type": "long"
+            },
+            "rs_sv_chem_l": {
+              "type": "long"
+            },
+            "rs_sv_cours_a": {
+              "type": "long"
+            },
+            "rs_sv_ligne_a": {
+              "type": "long"
+            },
+            "sae": {
+              "type": "boolean"
+            },
+            "sens": {
+              "type": "keyword"
+            },
+            "statut": {
+              "type": "keyword"
+            },
+            "terminus": {
+              "type": "keyword"
+            },
+            "vehicule": {
+              "type": "keyword"
+            },
+            "vitesse": {
+              "type": "long"
+            }
+          }
+        }
+      }
+    }
+  }
+}
+#+end_src
+
+#+begin_src json
+PUT _index_template/logs-httpjson.sv_vehic_p
+{
+ "index_patterns": [
+   "logs-httpjson.sv_vehic_p-*"
+ ],
+ "composed_of": [
+   "logs-httpjson.sv_vehic_p@package",
+   ".fleet_globals-1",
+   ".fleet_agent_id_verification-1"
+ ],
+ "priority": 200,
+ "data_stream": {
+   "hidden": false,
+   "allow_custom_routing": false
+ }
+}
+#+end_src
+
+* Sample
+#+begin_src json
+POST logs-httpjson.sv_vehic_p-default/_doc
+{
+  "type": "Feature",
+  "geometry": {
+    "type": "Point",
+    "coordinates": [
+      -0.5101128,
+      44.8461422
+    ]
+  },
+  "properties": {
+    "gid": 1621,
+    "geom_o": 11,
+    "geom_err": null,
+    "etat": "HEURE",
+    "retard": 0,
+    "sae": true,
+    "neutralise": false,
+    "bloque": false,
+    "arret": true,
+    "pmr": true,
+    "localise": true,
+    "vitesse": 0,
+    "vehicule": "BUS",
+    "statut": "TERMINUS_DEP",
+    "sens": "RETOUR",
+    "terminus": "Brandenburg",
+    "rs_sv_arret_p_actu": 2377,
+    "rs_sv_arret_p_suiv": 2377,
+    "rs_sv_chem_l": 786530,
+    "rs_sv_ligne_a": 27,
+    "rs_sv_cours_a": 1694292,
+    "cdate": "2025-01-16T00:00:00+01:00",
+    "mdate": "2025-01-16T14:18:44+01:00"
+  }
+}
+#+end_src
+
+* Schema evolution
+
+#+begin_src
+    "sae": true,
+    "neutralise": false,
+    "bloque": false,
+    "arret": true,
+    "pmr": true,
+    "localise": true,
+#+end_src
+
+* Create Zenika agencies
+#+begin_src json
+PUT zenika_agencies
+{
+  "mappings": {
+    "properties": {
+      "name": {
+        "type": "keyword"
+      },
+      "location": {
+        "type": "geo_point"
+      }
+    }
+  }
+}
+
+GET zenika_agencies/_search
+
+POST zenika_agencies/_bulk
+{ "index" : { "_id" : "1" } }
+{ "name" : "Zenika Bordeaux",  "location": "44.84807468781844, -0.5710687447906764" }
+{ "index" : { "_id" : "2" } }
+{ "name" : "Zenika Nantes",  "location": "47.207518227523934, -1.556091150706581" }
+{ "index" : { "_id" : "3" } }
+{ "name" : "Zenika Lyon",  "location": "45.76679352138929, 4.858845155762887" }
+{ "index" : { "_id" : "4" } }
+{ "name" : "Zenika Rennes",  "location": "48.11344204104916, -1.6611461000575192" }
+{ "index" : { "_id" : "5" } }
+{ "name" : "Zenika Paris",  "location": "48.87625098403148, 2.333622071106562" }
+{ "index" : { "_id" : "6" } }
+{ "name" : "Zenika Toulouse",  "location": "43.60220070030911, 1.4420695422706438" }
+{ "index" : { "_id" : "7" } }
+{ "name" : "Zenika Niort",  "location": "46.32223649194917, -0.45903851725262357" }
+{ "index" : { "_id" : "8" } }
+{ "name" : "Zenika Brest",  "location": "48.38408234679927, -4.483031486565276" }
+{ "index" : { "_id" : "9" } }
+{ "name" : "Zenika Grenoble",  "location": "45.18940870710513, 5.722212984598806" }
+{ "index" : { "_id" : "10" } }
+{ "name" : "Zenika Lille",  "location": "50.653228732213904, 3.079938126926969" }
+{ "index" : { "_id" : "11" } }
+{ "name" : "Zenika Canada",  "location": "45.51377836413255, -73.57089834913931" }
+{ "index" : { "_id" : "12" } }
+{ "name" : "Zenika Casablanca",  "location": "33.54790047547198, -7.639138165721741" }
+{ "index" : { "_id" : "13" } }
+{ "name" : "Zenika Singapore",  "location": "1.2769252665156743, 103.83942912985403" }
+{ "index" : { "_id" : "14" } }
+{ "name" : "Zenika Clermont-Ferrand",  "location": "45.75922776137658, 3.1300471243679944" }
+#+end_src
