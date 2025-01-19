@@ -179,36 +179,36 @@ Open https://traffic-dataviz.127.0.0.1.nip.io:5601/
 * Configure templates
 
 #+begin_src json
+# Configure ILM policy
 PUT _ilm/policy/sv_vehic_p
 {
- "policy": {
-   "phases": {
-     "hot": {
-       "min_age": "0ms",
-       "actions": {
-         "rollover": {
-           "max_primary_shard_size": "50gb",
-           "max_age": "7d"
-         },
-         "set_priority": {
-           "priority": 100
-         }
-       }
-     },
-     "delete": {
-       "min_age": "365d",
-       "actions": {
-         "delete": {
-           "delete_searchable_snapshot": true
-         }
-       }
-     }
-   }
- }
+  "policy": {
+    "phases": {
+      "hot": {
+        "min_age": "0ms",
+        "actions": {
+          "rollover": {
+            "max_primary_shard_size": "50gb",
+            "max_age": "7d"
+          },
+          "set_priority": {
+            "priority": 100
+          }
+        }
+      },
+      "delete": {
+        "min_age": "365d",
+        "actions": {
+          "delete": {
+            "delete_searchable_snapshot": true
+          }
+        }
+      }
+    }
+  }
 }
-#+end_src
 
-#+begin_src
+# Configure Ingest pipeline
 PUT _ingest/pipeline/sv_vehic_p_for_elastic_agent
 {
   "description": "Ingest pipeline for httpjson agent",
@@ -240,16 +240,16 @@ PUT _ingest/pipeline/sv_vehic_p_for_elastic_agent
     {
       "rename": {
         "field": "geometry",
-        "target_field": "Geo Shape",
+        "target_field": "Geo Point",
         "ignore_failure": true,
         "ignore_missing": true
       }
     }
   ]
 }
-#+end_src
 
-#+begin_src json
+
+# Configure template - Part I
 PUT _component_template/logs-httpjson.sv_vehic_p@package
 {
   "template": {
@@ -366,25 +366,79 @@ PUT _component_template/logs-httpjson.sv_vehic_p@package
     }
   }
 }
-#+end_src
 
-#+begin_src json
+# Configure template - Part II
 PUT _index_template/logs-httpjson.sv_vehic_p
 {
- "index_patterns": [
-   "logs-httpjson.sv_vehic_p-*"
- ],
- "composed_of": [
-   "logs-httpjson.sv_vehic_p@package",
-   ".fleet_globals-1",
-   ".fleet_agent_id_verification-1"
- ],
- "priority": 200,
- "data_stream": {
-   "hidden": false,
-   "allow_custom_routing": false
- }
+  "index_patterns": [
+    "logs-httpjson.sv_vehic_p-*"
+  ],
+  "composed_of": [
+    "logs-httpjson.sv_vehic_p@package",
+    ".fleet_globals-1",
+    ".fleet_agent_id_verification-1"
+  ],
+  "priority": 200,
+  "data_stream": {
+    "hidden": false,
+    "allow_custom_routing": false
+  }
 }
+
+
+# Test ingestion, <type>-<dataset>-<namespace>
+POST logs-httpjson.sv_vehic_p-default/_doc
+{
+  "type": "Feature",
+  "geometry": {
+    "type": "Point",
+    "coordinates": [
+      -0.5101128,
+      44.8461422
+    ]
+  },
+  "properties": {
+    "gid": 1621,
+    "geom_o": 11,
+    "geom_err": null,
+    "etat": "HEURE",
+    "retard": 0,
+    "sae": true,
+    "neutralise": false,
+    "bloque": false,
+    "arret": true,
+    "pmr": true,
+    "localise": true,
+    "vitesse": 0,
+    "vehicule": "BUS",
+    "statut": "TERMINUS_DEP",
+    "sens": "RETOUR",
+    "terminus": "Brandenburg",
+    "rs_sv_arret_p_actu": 2377,
+    "rs_sv_arret_p_suiv": 2377,
+    "rs_sv_chem_l": 786530,
+    "rs_sv_ligne_a": 27,
+    "rs_sv_cours_a": 1694292,
+    "cdate": "2025-01-16T00:00:00+01:00",
+    "mdate": "2025-01-16T14:18:44+01:00"
+  }
+}
+
+# Check data stream
+GET _data_stream/logs-httpjson.sv_vehic_p-default
+
+GET logs-httpjson.sv_vehic_p-default/_search
+{
+  "query": {
+    "range": {
+      "@timestamp": {
+        "gte": "2025-01-16T00:00:00+01:00"
+      }
+    }
+  }
+}
+
+DELETE _data_stream/logs-httpjson.sv_vehic_p-default
 #+end_src
 
 * Sample
@@ -426,6 +480,72 @@ POST logs-httpjson.sv_vehic_p-default/_doc
   }
 }
 #+end_src
+
+* Configure Integration
+
+1. Integration name: httpjson-sv_vehic_p
+2. Dataset name: httpjson.sv_vehic_p
+3. Request URL: https://data.bordeaux-metropole.fr/geojson?key=&typename=sv_vehic_p
+4. Response Split: target: body.features
+
+#+begin_src json
+PUT kbn:/api/fleet/package_policies/229928b2-4326-4d00-869c-b068b683336b
+{
+  "package": {
+    "name": "httpjson",
+    "version": "1.21.1"
+  },
+  "name": "httpjson-sv_vehic_p-backup",
+  "namespace": "defaultbackup",
+  "description": "",
+  "policy_ids": [
+    "eck-agent"
+  ],
+  "output_id": null,
+  "vars": {},
+  "inputs": {
+    "generic-httpjson": {
+      "enabled": true,
+      "streams": {
+        "httpjson.generic": {
+          "enabled": true,
+          "vars": {
+            "data_stream.dataset": "httpjson.sv_vehic_p",
+            "request_url": "https://data.bordeaux-metropole.fr/geojson?key=&typename=sv_vehic_p",
+            "request_interval": "1m",
+            "request_method": "GET",
+            "username": "",
+            "password": "",
+            "oauth_secret": "",
+            "request_body": "",
+            "request_transforms": "",
+            "response_split": "target: body.features",
+            "request_redirect_headers_ban_list": [],
+            "oauth_scopes": [],
+            "tags": [
+              "forwarded"
+            ]
+          }
+        }
+      }
+    }
+  }
+}
+
+#+end_src
+
+* Check data
+
+1. Check data stream creation
+2. Create data view on logs-httpjson.sv_vehic_p-default, name Suivi Vehicules
+3. Go to discover
+
+
+* Kibana Maps
+
+1. Create ZNK agencies map
+2. Create simple document for traffic
+
 
 * Schema evolution
 
